@@ -2,13 +2,12 @@
 #include <api/mictcp_core.h>
 
 
-
-#define NB_MAX_SOCKET 10 
+#define NB_MAX_SOCKET 2
 
 int compteur_socket = 0;
 
-mic_tcp_sock sockets[NB_MAX_SOCKET]; //A terme créer une structure de dictionnaire/hashMap
-mic_tcp_sock sockets_distant_associes[NB_MAX_SOCKET]; 
+mic_tcp_sock socket_local;
+mic_tcp_sock socket_distant_associe;
 
 
 /*
@@ -24,14 +23,16 @@ int mic_tcp_socket(start_mode sm) {
    }
 
    // On choisi un numéro de port local associé à ce socket (>1024, unique)
-   
+    if(compteur_socket>=NB_MAX_SOCKET){
+   	fprintf(stderr, "Trop de demande de connexion");
+   	exit(EXIT_FAILURE);
+   }
+
    mic_tcp_sock socket;
    socket.fd = compteur_socket;
-   socket.state = IDLE;
-   
-   sockets[compteur_socket++] = socket;
-   
-   return socket.fd; 
+   socket.state = IDLE; 
+
+   return socket_local.fd; 
 }
 
 
@@ -41,7 +42,7 @@ int mic_tcp_socket(start_mode sm) {
  */
 int mic_tcp_bind(int socket, mic_tcp_sock_addr addr) {
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   sockets[socket].addr = addr;
+   socket_local.addr = addr;
    return 0;
 }
 /*
@@ -60,7 +61,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr) {
 int mic_tcp_connect (int socket, mic_tcp_sock_addr addr) {
 
 	printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-	sockets_distant_associes[socket].addr = addr;
+	socket_distant_associe.addr = addr;
 	
 	return 0;
 }
@@ -72,13 +73,13 @@ int mic_tcp_connect (int socket, mic_tcp_sock_addr addr) {
 int mic_tcp_send (int mic_sock, char* mesg, int mesg_size) {
 	printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 	mic_tcp_pdu pdu;
-	pdu.header.source_port = sockets[mic_sock].addr.port; 
-	pdu.header.dest_port = sockets_distant_associes[mic_sock].addr.port;
+	pdu.header.source_port = socket_local.addr.port; 
+	pdu.header.dest_port = socket_distant_associe.addr.port;
 
 	pdu.payload.data = mesg;
 	pdu.payload.size = mesg_size;
 	
-	int effective_send = IP_send(pdu, sockets_distant_associes[mic_sock].addr);
+	int effective_send = IP_send(pdu, socket_distant_associe.addr);
 	
         return effective_send;
 }
@@ -108,13 +109,9 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) {
 	// Vérifions : que le port destination du pdu est un port local attribué à un socket mictcp
 	
 	int est_port_associe_sock_local = 0;
-	
-	for(int i = 0; i < compteur_socket; i++){
-		if(sockets[i].addr.port == pdu.header.dest_port) 
-			est_port_associe_sock_local = 1;
+	if(socket_local.addr.port == pdu.header.dest_port) 
+		est_port_associe_sock_local = 1;
 
-		
-	}
 
 	//Vérifier des numéros de séquence => pas dans cette version
 	if(!est_port_associe_sock_local){
