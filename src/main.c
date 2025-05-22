@@ -1,6 +1,6 @@
 #include "mictcp.h"
 
-int main(int argc, int **char argv){
+int main(int argc, char** argv){
 
 	
 

@@ -1,20 +1,22 @@
-#include "mictpc.h"
+#include "mictcp.h"
 
-mic_tcp_socket mon_socket;
+
+#define NB_MAX_SOCKET 10 
 
 int compteur_socket = 0;
 const int nb_max_socket = 10;
 
 
-mic_tcp_socket *sockets = malloc(sizeof(mic_tcp_socket) * nb_max_socket); //A terme créer une structure de dictionnaire/hashMap
-mic_tcp_socket *sockets_distant_associes = malloc(sizeof(mic_tcp_socket) * nb_max_socket);
+mic_tcp_sock *sockets = malloc(sizeof(mic_tcp_sock) * nb_max_socket); //A terme créer une structure de dictionnaire/hashMap
+mic_tcp_sock *sockets_distant_associes = malloc(sizeof(mic_tcp_sock) * nb_max_socket);
+
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
  * Retourne le descripteur du socket ou bien -1 en cas d'erreur
  */
 int mic_tcp_socket(start_mode sm) {
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   result = initialize_components(sm); /* Appel obligatoire */
+   int result = initialize_components(sm); /* Appel obligatoire */
    if(result){
    	fprintf(stderr, "initialize_components a échouée dans mic_tcp_socket lors de la création du socket %d \n", compteur_socket);
    	exit(EXIT_FAILURE);
