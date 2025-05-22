@@ -17,8 +17,8 @@ mic_tcp_sock sockets_distant_associes[NB_MAX_SOCKET];
  */
 int mic_tcp_socket(start_mode sm) {
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   int result = initialize_components(sm); /* Appel obligatoire */
-   if(result){
+   
+   if(initialize_components(sm) == -1){
    	fprintf(stderr, "initialize_components a échouée dans mic_tcp_socket lors de la création du socket %d \n", compteur_socket);
    	exit(EXIT_FAILURE);
    }
