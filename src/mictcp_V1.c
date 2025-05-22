@@ -1,3 +1,5 @@
+#include "mictpc.h"
+
 mic_tcp_socket mon_socket;
 
 int compteur_socket = 0;
