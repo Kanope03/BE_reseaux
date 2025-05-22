@@ -1,14 +1,15 @@
-#include "mictcp.h"
+#include "../include/mictcp.h"
+#include <api/mictcp_core.h>
+
 
 
 #define NB_MAX_SOCKET 10 
 
 int compteur_socket = 0;
-const int nb_max_socket = 10;
 
+mic_tcp_sock sockets[NB_MAX_SOCKET]; //A terme créer une structure de dictionnaire/hashMap
+mic_tcp_sock sockets_distant_associes[NB_MAX_SOCKET]; 
 
-mic_tcp_sock *sockets = malloc(sizeof(mic_tcp_sock) * nb_max_socket); //A terme créer une structure de dictionnaire/hashMap
-mic_tcp_sock *sockets_distant_associes = malloc(sizeof(mic_tcp_sock) * nb_max_socket);
 
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
@@ -23,8 +24,14 @@ int mic_tcp_socket(start_mode sm) {
    }
 
    // On choisi un numéro de port local associé à ce socket (>1024, unique)
-   mon_socket.fd = compteur_socket++;
-   return mon_socket.fd; 
+   
+   mic_tcp_sock socket;
+   socket.fd = compteur_socket;
+   socket.state = IDLE;
+   
+   sockets[compteur_socket++] = socket;
+   
+   return socket.fd; 
 }
 
 
@@ -64,14 +71,14 @@ int mic_tcp_connect (int socket, mic_tcp_sock_addr addr) {
  
 int mic_tcp_send (int mic_sock, char* mesg, int mesg_size) {
 	printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-	Mic_tcp_pdu pdu;
+	mic_tcp_pdu pdu;
 	pdu.header.source_port = sockets[mic_sock].addr.port; 
 	pdu.header.dest_port = sockets_distant_associes[mic_sock].addr.port;
 
 	pdu.payload.data = mesg;
 	pdu.payload.size = mesg_size;
 	
-	int effective_send = IP_send(pdu, sockets_distant_associes[mic_sock].addr.port);
+	int effective_send = IP_send(pdu, sockets_distant_associes[mic_sock].addr);
 	
         return effective_send;
 }
@@ -101,15 +108,19 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) {
 	// Vérifions : que le port destination du pdu est un port local attribué à un socket mictcp
 	
 	int est_port_associe_sock_local = 0;
+	
 	for(int i = 0; i < compteur_socket; i++){
-		if(sockets[i].addr.port == pdr.header.dest_port) 
+		if(sockets[i].addr.port == pdu.header.dest_port) 
 			est_port_associe_sock_local = 1;
 
 		
 	}
 
 	//Vérifier des numéros de séquence => pas dans cette version
-	
+	if(!est_port_associe_sock_local){
+		exit(EXIT_FAILURE);
+		fprintf(stderr, "Le port de destination du pdu n'est pas un port local attribué à un socket mictcp\n");
+	}
 	app_buffer_put(pdu.payload);
 	// Envoyer un ack => pas dans cette version
 	
@@ -127,16 +138,8 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr) {
  */
 int mic_tcp_close (int socket) {
 	printf("[MIC-TCP] Appel de la fonction :  "); printf(__FUNCTION__); printf("\n");
-	return -1; }
-
-
-/*
- * Traitement d’un PDU MIC-TCP reçu (mise à jour des numéros de séquence
- * et d'acquittement, etc.) puis insère les données utiles du PDU dans
- * le buffer de réception du socket. Cette fonction utilise la fonction
- * app_buffer_put().
- */
-void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_sock_addr addr)
-{
-    printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+	return -1; 
 }
+
+
+
