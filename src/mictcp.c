@@ -78,7 +78,7 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 	mic_tcp_pdu pdu;
 	pdu.header.source_port = socket_local.local_addr.port; 
-	pdu.header.dest_port = socket_distant_associe.remote_addr.port;
+	pdu.header.dest_port = socket_distant_associe.local_addr.port;
 
 	pdu.payload.data = mesg;
 	pdu.payload.size = mesg_size;
