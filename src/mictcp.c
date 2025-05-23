@@ -126,13 +126,10 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
     
-/*
-	if(pdu.header.source_port != local_addr.port){
-		exit(EXIT_FAILURE);
+	if(pdu.header.dest_port != socket_local.local_addr.port){
 		fprintf(stderr, "Le port de destination du pdu n'est pas un port local attribué à un socket mictcp\n");
-	}
-*/	
-	app_buffer_put(pdu.payload);
-    
-    
+    }
+	else{
+        app_buffer_put(pdu.payload);
+    }
 }
