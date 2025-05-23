@@ -22,7 +22,7 @@ int mic_tcp_socket(start_mode sm)
    if(initialize_components(sm) == -1){
    	fprintf(stderr, "initialize_components a échouée dans mic_tcp_socket lors de la création du socket %d \n", compteur_socket);
    	exit(EXIT_FAILURE);
-   }//Dans la V1
+   }
    compteur_socket++;
 
    if(compteur_socket>=NB_MAX_SOCKET){
@@ -64,7 +64,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-	socket_distant_associe.addr = addr;
+    socket_distant_associe.local_addr = addr;
 	
 	return 0;
 }
@@ -77,8 +77,8 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 	mic_tcp_pdu pdu;
-	pdu.header.source_port = socket_local.addr.port; 
-	pdu.header.dest_port = socket_distant_associe.addr.port;
+	pdu.header.source_port = socket_local.local_addr.port; 
+	pdu.header.dest_port = socket_distant_associe.remote_addr.port;
 
 	pdu.payload.data = mesg;
 	pdu.payload.size = mesg_size;
@@ -131,7 +131,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 		exit(EXIT_FAILURE);
 		fprintf(stderr, "Le port de destination du pdu n'est pas un port local attribué à un socket mictcp\n");
 	}
-	
+*/	
 	app_buffer_put(pdu.payload);
     
     
