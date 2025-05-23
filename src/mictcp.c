@@ -1,6 +1,10 @@
 #include <mictcp.h>
 #include <api/mictcp_core.h>
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 7cab9f8ef7a1ce419843d68da1bc3a61a5960b67
 #define NB_MAX_SOCKET 10
 
 int compteur_socket = 0;
@@ -53,7 +57,8 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-    return -1;
+	// on fait un mictcp sans connexion, donc on fait rien
+	return 0; 
 }
 
 /*
@@ -63,7 +68,9 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-    return -1;
+	socket_distant_associe.addr = addr;
+	
+	return 0;
 }
 
 /*
@@ -73,7 +80,16 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-    return -1;
+	mic_tcp_pdu pdu;
+	pdu.header.source_port = socket_local.addr.port; 
+	pdu.header.dest_port = socket_distant_associe.addr.port;
+
+	pdu.payload.data = mesg;
+	pdu.payload.size = mesg_size;
+	
+	int effective_send = IP_send(pdu, socket_distant_associe.addr);
+	
+    return effective_send;
 }
 
 /*
@@ -84,8 +100,13 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
  */
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
 {
-    printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-    return -1;
+
+	printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+	mic_tcp_payload payload;
+	payload.data = mesg;
+	payload.size = max_mesg_size;	
+	int effectivement_lues_du_buffer = app_buffer_get(payload); //L'appel à app_buffer_get est déjà bloquant. 
+	return effectivement_lues_du_buffer;
 }
 
 /*
@@ -108,4 +129,14 @@ int mic_tcp_close (int socket)
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_ip_addr remote_addr)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+    
+
+	if(pdu.header.port != addr.port){
+		exit(EXIT_FAILURE);
+		fprintf(stderr, "Le port de destination du pdu n'est pas un port local attribué à un socket mictcp\n");
+	}
+	
+	app_buffer_put(pdu.payload);
+    
+    
 }
