@@ -1,6 +1,13 @@
 #include <mictcp.h>
 #include <api/mictcp_core.h>
 
+#define NB_MAX_SOCKET 10
+
+int compteur_socket = 0;
+
+mic_tcp_sock socket_local;
+mic_tcp_sock socket_distant_associe;
+
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
  * Retourne le descripteur du socket ou bien -1 en cas d'erreur
@@ -12,7 +19,20 @@ int mic_tcp_socket(start_mode sm)
    result = initialize_components(sm); /* Appel obligatoire */
    set_loss_rate(0);
 
-   return result;
+   if(initialize_components(sm) == -1){
+   	fprintf(stderr, "initialize_components a échouée dans mic_tcp_socket lors de la création du socket %d \n", compteur_socket);
+   	exit(EXIT_FAILURE);
+   }//Dans la V1
+   compteur_socket++;
+
+   if(compteur_socket>=NB_MAX_SOCKET){
+    fprintf(stderr, "Trop de demande de connexion");
+   	exit(EXIT_FAILURE);
+   }
+   socket_local.fd = compteur_socket;   //Attribution d'un numero et modification de l'etat du socket
+   socket_local.state = IDLE;
+
+   return socket_local.fd;
 }
 
 /*
@@ -22,7 +42,8 @@ int mic_tcp_socket(start_mode sm)
 int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 {
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   return -1;
+   socket_local.local_addr = addr;
+   return 0;    
 }
 
 /*
