@@ -54,6 +54,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
 	// on fait un mictcp sans connexion, donc on fait rien
+    socket_local.remote_addr = *addr;
 	return 0; 
 }
 
@@ -132,4 +133,5 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 	else{
         app_buffer_put(pdu.payload);
     }
+
 }
