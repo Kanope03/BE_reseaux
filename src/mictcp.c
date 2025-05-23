@@ -3,6 +3,8 @@
 
 #define NB_MAX_SOCKET 10
 
+const long timeout = 1000;
+
 int compteur_socket = 0;
 
 mic_tcp_sock socket_local;
@@ -53,9 +55,29 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-	// on fait un mictcp sans connexion, donc on fait rien
-    socket_local.remote_addr = *addr;
-	return 0; 
+	
+    mic_tcp_pdu pdu_syn, pdu_synack, pdu_ack;
+    int compteur_envoie = 10;
+    //On se met en attente d'un SYN puis on recupere le SYN
+    if(IP_recv(&pdu_syn, &socket_local.local_addr.ip_addr, &socket_distant_associe.local_addr.ip_addr, timeout)){printf("Error: IP_recv error for the first ack");return -1;}
+    //On envoie un ack
+    if(pdu_syn.header.syn == 1){
+        pdu_synack.header.ack = 1;
+        pdu_synack.header.syn = 1;
+        if(IP_send(pdu_synack, socket_local.local_addr.ip_addr)){printf("Error: IP_send didn't send the synack");return -1;}
+        //On se met en attente d'un ack
+        for( int i=0; i<compteur_envoie; i++){
+        if(IP_recv(&pdu_ack, &socket_local.local_addr.ip_addr, &socket_distant_associe.local_addr.ip_addr, timeout)){
+            //Si le teimer expire, on renvoie le ack
+            if(IP_send(pdu_synack, socket_local.local_addr.ip_addr)){printf("Error: IP_send didn't send the synack");return -1;}
+        }
+        //Si il accepte la connection
+        if(pdu_ack.header.ack = 1){
+            socket_local.remote_addr = *addr;
+            return 0; 
+        }
+    }   
+
 }
 
 /*
