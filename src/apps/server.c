@@ -3,15 +3,16 @@
 
 #define MAX_SIZE 1000
 
-int main()
+int main(int argc, char *argv[])
 {
     int sockfd;
     mic_tcp_sock_addr addr;
     mic_tcp_sock_addr remote_addr;
     char chaine[MAX_SIZE];
 
-    addr.ip_addr = "127.0.0.1";
-    addr.port = 1234;
+    addr.ip_addr.addr = "127.0.0.1";
+    addr.ip_addr.addr_size = strlen(addr.ip_addr.addr) + 1;
+    addr.port = atoi(argv[1]);
 
 
     if ((sockfd = mic_tcp_socket(SERVER)) == -1)
@@ -54,7 +55,7 @@ int main()
         printf("[TSOCK] Attente d'une donnee, appel de mic_recv ...\n");
         rcv_size = mic_tcp_recv(sockfd, chaine, MAX_SIZE);
         printf("[TSOCK] Reception d'un message de taille : %d\n", rcv_size);
-        printf("[TSOCK] Message Recu : %s", chaine);
+        printf("[TSOCK] Message Recu : %s\n", chaine);
     }
     return 0;
 }
