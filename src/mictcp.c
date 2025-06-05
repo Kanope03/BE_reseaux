@@ -5,6 +5,7 @@
 #define NB_MAX_SOCKET 10
 
 const long timeout = 1000;
+const int limite_envoie = 10;
 
 int compteur_socket = 0;
 int seq_num = 0;
@@ -56,6 +57,7 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
  */
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
+    //Dans la v2, on ne traite pas encore la phase d'établissement de connexion
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
 	socket_local.state = IDLE;
     socket_local.remote_addr = *addr;
@@ -94,7 +96,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
 
-   socket_distant_associe.local_addr = addr;
+    socket_distant_associe.local_addr = addr;
 	return 0;
 }
 
@@ -105,16 +107,36 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-	mic_tcp_pdu pdu;
-	pdu.header.source_port = socket_local.local_addr.port; 
+	
+    mic_tcp_pdu pdu, recv_pdu;
+	//Initialisation des headers
+    pdu.header.source_port = socket_local.local_addr.port; 
 	pdu.header.dest_port = socket_distant_associe.local_addr.port;
+    //seq_num a déjà été initialisé en global
 
+    //On charge le message
 	pdu.payload.data = mesg;
 	pdu.payload.size = mesg_size;
 	
+    //envoie du PDU
 	int effective_send = IP_send(pdu, socket_distant_associe.local_addr.ip_addr);
 	
+    //Il se met en attente du pdu, avec le timer timeout
+
+    int received, compteur = 0;
+    do{
+        do{
+            if((received = IP_recv(&recv_pdu, &socket_local.local_addr.ip_addr, &socket_distant_associe.local_addr.ip_addr, timeout))==-1){
+                //Si le timer expire, on renvoie le pdu
+                IP_send(pdu, socket_distant_associe.local_addr.ip_addr);
+                compteur++;
+            }
+        }while(received ==-1 && compteur <= limite_envoie); 
+    }while(recv_pdu.header.ack !=seq_num);
+    
+    seq_num++;
     return effective_send;
+
 }
 
 /*
