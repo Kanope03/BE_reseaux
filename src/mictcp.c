@@ -77,7 +77,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
             if(IP_send(pdu_synack, socket_local.local_addr.ip_addr)){printf("Error: IP_send didn't send the synack");return -1;}
         }
         //Si il accepte la connection
-        if(pdu_ack.header.ack = 1){
+        if(pdu_ack.header.ack == 1){
             socket_local.remote_addr = *addr;
             return 0; 
         }
@@ -94,25 +94,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
 
-    mic_tcp_pdu pdu_sync;
-
-    
-    mic_tcp_header header = {socket_local.local_addr.port, addr.port, seq_num, -1, 1, 0, 0};
-
-    pdu_sync.header = header;
-    //pdu_sync.payload = NULL;
-
-    fprintf(stderr, " l'adresse ip vaut %s, celle du socket_distant_associé vaut : %s\n", addr.ip_addr.addr, socket_distant_associe.local_addr.ip_addr.addr);
-    exit(0);
-
-    IP_send(pdu_sync, socket_distant_associe.local_addr.ip_addr);
-
-
-    /*Dans cette version cette ligne est a déplacé dans PDU receive lors de la réception du ACK de l'ACK SYNC
-        socket_distant_associe.local_addr = addr;
-    */
-    
-	
+   socket_distant_associe.local_addr = addr;
 	return 0;
 }
 
@@ -120,7 +102,7 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
  * Permet de réclamer l’envoi d’une donnée applicative
  * Retourne la taille des données envoyées, et -1 en cas d'erreur
  */
-int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
+int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 	mic_tcp_pdu pdu;
@@ -183,6 +165,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 
         if(socket_local.state != IDLE){
             fprintf(stderr, "Le socket %d a reçu une demande de conexion mais n'est pas prèt à en recevoir, état : %s\n", socket_local.fd, number_to_state(socket_local.state));
+            return;
         }
 
         socket_local.state = SYN_RECEIVED;
@@ -212,7 +195,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
             socket_distant_associe.local_addr.port = pdu.header.dest_port;
             socket_local.state = ESTABLISHED;
             
-            IP_send();
+            //IP_send();
 
         }
     }
