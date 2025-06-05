@@ -8,11 +8,12 @@ const long timeout = 10000;
 const int limite_envoie = 10;
 
 int compteur_socket = 0;
-int seq_num = 0;
-int ack_num = 0;
+int seq_attendu = 0;
+int seq_envoye = 0;
 
-mic_tcp_sock socket_local;
-mic_tcp_sock socket_distant_associe;
+mic_tcp_sock sock;
+
+
 
 /*
  * Permet de créer un socket entre l’application et MIC-TCP
@@ -34,10 +35,10 @@ int mic_tcp_socket(start_mode sm)
     fprintf(stderr, "Trop de demande de connexion");
    	exit(EXIT_FAILURE);
    }
-   socket_local.fd = compteur_socket;   //Attribution d'un numero et modification de l'etat du socket
-   socket_local.state = CLOSED;
+   sock.fd = compteur_socket;   //Attribution d'un numero et modification de l'etat du socket
+   sock.state = CLOSED;
 
-   return socket_local.fd;
+   return sock.fd;
 }
 
 /*
@@ -47,7 +48,7 @@ int mic_tcp_socket(start_mode sm)
 int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 {
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   socket_local.local_addr = addr;
+   sock.local_addr = addr;
    return 0;    
 }
 
@@ -59,10 +60,15 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     //Dans la v2, on ne traite pas encore la phase d'établissement de connexion
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-	socket_local.state = IDLE;
-    socket_local.remote_addr = *addr;
+	sock.state = IDLE;
+    sock.remote_addr = *addr;
+    //socket_local.remote_addr = *addr;
 	return 0; 
 	
+
+    /*
+    
+
     mic_tcp_pdu pdu_syn, pdu_synack, pdu_ack;
     int compteur_envoie = 10;
     //On se met en attente d'un SYN puis on recupere le SYN
@@ -85,7 +91,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
         }
     }   
 
-    }
+    }*/
 }
 
 /*
@@ -96,9 +102,9 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
 
-    socket_distant_associe.local_addr = addr;
+    sock.remote_addr = addr;
 
-    fprintf(stderr, " [CONNECT ] adresse sock distant %s \n", socket_distant_associe.local_addr.ip_addr.addr);
+    fprintf(stderr, " [CONNECT ] adresse sock distant %s \n", sock.remote_addr.ip_addr.addr);
 
 	return 0;
 }
@@ -113,9 +119,9 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
 	
     mic_tcp_pdu pdu, recv_pdu;
 	//Initialisation des headers
-    pdu.header.source_port = socket_local.local_addr.port; 
-	pdu.header.dest_port = socket_distant_associe.local_addr.port;
-    pdu.header.seq_num = seq_num;
+    pdu.header.source_port = sock.local_addr.port; 
+	pdu.header.dest_port = sock.remote_addr.port;
+    pdu.header.seq_num = seq_envoye;
     //seq_num a déjà été initialisé en global
 
     //On charge le message
@@ -123,26 +129,28 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
 	pdu.payload.size = mesg_size;
 	
     //envoie du PDU
-	int effective_send = IP_send(pdu, socket_distant_associe.local_addr.ip_addr);
+	int effective_send = IP_send(pdu, sock.remote_addr.ip_addr);
 	
     //Il se met en attente du pdu, avec le timer timeout
 
     int received, compteur = 0;
     do{
         do{
-            if((received = IP_recv(&recv_pdu, &socket_local.local_addr.ip_addr, &socket_distant_associe.local_addr.ip_addr, timeout))==-1){
+            if((received = IP_recv(&recv_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout))==-1){
                 printf("Sans surprise ça vaut %d\n\n", received);
                 //Si le timer expire, on renvoie le pdu
-                IP_send(pdu, socket_distant_associe.local_addr.ip_addr);
+                IP_send(pdu, sock.remote_addr.ip_addr);
                 compteur++;
             }
         }while(received ==-1 && compteur <= limite_envoie); 
 
-        fprintf(stderr, "Le numéro de séquence attendu est le %d et le numéro reçu est le %d", seq_num, recv_pdu.header.seq_num);
+        fprintf(stderr, "Le numéro de séquence envoyé est le %d et l'ack reçu est le %d\n", seq_envoye, recv_pdu.header.ack_num);
 
-    }while(recv_pdu.header.ack !=seq_num);
+    }while(recv_pdu.header.ack_num !=seq_envoye);
     
-    seq_num++;
+    
+
+    seq_envoye = (seq_envoye + 1) % 2;
     return effective_send;
 
 }
@@ -186,7 +194,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 
 
-    if(pdu.header.dest_port != socket_local.local_addr.port){
+    if(pdu.header.dest_port != sock.local_addr.port){
         fprintf(stderr, "Le port de destination du pdu n'est pas un port local attribué à un socket mictcp\n");
         return;
 	}
@@ -194,20 +202,17 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
     //exit(0);
 
     if(pdu.header.ack){
-        if(socket_local.state == SYN_RECEIVED){
+        if(sock.state == SYN_RECEIVED){
 
-        mic_tcp_sock_addr remote_sock_addr;
+        sock.local_addr.ip_addr = local_addr;
+        sock.remote_addr.ip_addr = remote_addr;
 
-        remote_sock_addr.ip_addr = remote_addr;
-        remote_sock_addr.port = pdu.header.source_port;
+        sock.state = ESTABLISHED;
 
-        socket_distant_associe.local_addr = remote_sock_addr;
-        socket_local.state = ESTABLISHED;
-
-        }else if(socket_local.state == SYN_SENT){
-            socket_distant_associe.local_addr.ip_addr = remote_addr; 
-            socket_distant_associe.local_addr.port = pdu.header.dest_port;
-            socket_local.state = ESTABLISHED;
+        }else if(sock.state == SYN_SENT){
+            sock.remote_addr.ip_addr = remote_addr; 
+            sock.remote_addr.port = pdu.header.dest_port;
+            sock.state = ESTABLISHED;
             
             //IP_send();
 
@@ -217,18 +222,28 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
         return;
     }
     else{
-        mic_tcp_pdu ack_pdu;
 
-        fprintf(stderr, " adresse sock distant %s \n", remote_addr.addr);
+        if(seq_attendu == pdu.header.seq_num){
+            mic_tcp_pdu ack_pdu;
 
-        ack_pdu.header.source_port = socket_local.local_addr.port; 
-	    ack_pdu.header.dest_port = pdu.header.source_port;
-        ack_pdu.header.seq_num = seq_num;
-        ack_pdu.header.ack = 1;
+            fprintf(stderr, " adresse sock distant %s \n", remote_addr.addr);
+            fprintf(stderr, "port source %d, port dest : %d\n", sock.local_addr.port, sock.remote_addr.port);
 
-        IP_send(ack_pdu, remote_addr);
+
+            ack_pdu.header.source_port = sock.local_addr.port; 
+            ack_pdu.header.dest_port = sock.remote_addr.port;
+            
+            ack_pdu.header.ack = 1;
+            ack_pdu.header.ack_num = pdu.header.seq_num;
+
+            IP_send(ack_pdu, remote_addr);
+            
+            seq_attendu = (seq_attendu + 1) % 2;
+
+            app_buffer_put(pdu.payload);
+        }
+
         
-        app_buffer_put(pdu.payload);
     }
     
 }
