@@ -2,7 +2,6 @@
 #include "api/mictcp_core.h"
 
 
-
 #define NB_MAX_SOCKET 10
 
 int compteur_socket = 0;
@@ -18,9 +17,8 @@ mic_tcp_sock socket_distant_associe;
  */
 int mic_tcp_socket(start_mode sm)
 {
-   int result = -1;
+   
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   result = initialize_components(sm); /* Appel obligatoire */
    set_loss_rate(0);
 
    if(initialize_components(sm) == -1){
@@ -34,7 +32,7 @@ int mic_tcp_socket(start_mode sm)
    	exit(EXIT_FAILURE);
    }
    socket_local.fd = compteur_socket;   //Attribution d'un numero et modification de l'etat du socket
-   socket_local.state = IDLE;
+   socket_local.state = CLOSED;
 
    return socket_local.fd;
 }
@@ -57,7 +55,7 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-	// on fait un mictcp sans connexion, donc on fait rien
+	socket_local.state = IDLE;
     socket_local.remote_addr = *addr;
 	return 0; 
 }
@@ -78,8 +76,10 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     pdu_sync.header = header;
     //pdu_sync.payload = NULL;
 
+    fprintf(stderr, " l'adresse ip vaut %s, celle du socket_distant_associé vaut : %s\n", addr.ip_addr.addr, socket_distant_associe.local_addr.ip_addr.addr);
+    exit(0);
 
-    Ip_send(pdu_sync, socket_distant_associe.local_addr.ip_addr);
+    IP_send(pdu_sync, socket_distant_associe.local_addr.ip_addr);
 
 
     /*Dans cette version cette ligne est a déplacé dans PDU receive lors de la réception du ACK de l'ACK SYNC
@@ -118,7 +118,6 @@ int mic_tcp_send (int mic_sock, char* mesg, int mesg_size)
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size)
 {
 
-
 	printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
 	mic_tcp_payload payload;
 	payload.data = mesg;
@@ -155,20 +154,80 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
     
     if(pdu.header.syn){
 
+        if(socket_local.state != IDLE){
+            fprintf(stderr, "Le socket %d a reçu une demande de conexion mais n'est pas prèt à en recevoir, état : %s\n", socket_local.fd, number_to_state(socket_local.state));
+        }
+
+        socket_local.state = SYN_RECEIVED;
+
         mic_tcp_pdu pdu_ack_sync;
 
         mic_tcp_header header = {socket_local.local_addr.port, socket_distant_associe.local_addr.port, seq_num, pdu.header.seq_num, 0, 1, 0}; 
         pdu_ack_sync.header = header; 
 
         IP_send(pdu_ack_sync, remote_addr);
+
+
         
-    }else if(pdu.header.fin){
+    }else if(pdu.header.ack){
+        if(socket_local.state == SYN_RECEIVED){
+
+        mic_tcp_sock_addr remote_sock_addr;
+
+        remote_sock_addr.ip_addr = remote_addr;
+        remote_sock_addr.port = pdu.header.source_port;
+
+        socket_distant_associe.local_addr = remote_sock_addr;
+        socket_local.state = ESTABLISHED;
+
+        }else if(socket_local.state == SYN_SENT){
+            socket_distant_associe.local_addr.ip_addr = remote_addr; 
+            socket_distant_associe.local_addr.port = pdu.header.dest_port;
+            socket_local.state = ESTABLISHED;
+            
+            IP_send();
+
+        }
+    }
+    else if(pdu.header.fin){
         return;
     }
     else{
         app_buffer_put(pdu.payload);
     }
-
-	
     
 }
+
+char *number_to_state(protocol_state state){
+        switch (state)
+        {
+        case IDLE:
+            return "IDLE";
+            break;
+        
+        case CLOSED:
+            return "CLOSED"; 
+            break;
+
+        case SYN_SENT:
+            return "SYN_SENT"; 
+            break;
+
+        case SYN_RECEIVED:
+            return "SYN_RECEIVED"; 
+            break;
+
+        case ESTABLISHED:
+            return "ESTABLISHED"; 
+            break;
+
+        case CLOSING:
+            return "CLOSING"; 
+            break;
+        
+        default:
+            return "UNKNOWN STATE";
+            break;
+        }
+        
+    }

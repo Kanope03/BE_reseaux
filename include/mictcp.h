@@ -110,5 +110,6 @@ int mic_tcp_send (int socket, char* mesg, int mesg_size);
 int mic_tcp_recv (int socket, char* mesg, int max_mesg_size);
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_ip_addr remote_addr);
 int mic_tcp_close(int socket);
+char *number_to_state(protocol_state state);
 
 #endif

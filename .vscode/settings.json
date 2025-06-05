@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "mictcp.h": "c",
-        "mictcp_core.h": "c"
+        "mictcp_core.h": "c",
+        "inet.h": "c"
     }
 }
