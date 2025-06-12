@@ -181,8 +181,6 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
 
     }
 
-    printf("On arrive ici et result vaut %d\n", result);
-
     /* Free the reception buffer */
     free(buffer);
 
