@@ -11,6 +11,7 @@ int compteur_socket = 0;
 int seq_attendu = 0;
 int seq_envoye = 0;
 int dernier_num_seq_traite = -1;
+int rate_loss = 10;
 
 mic_tcp_sock sock;
 
@@ -24,7 +25,7 @@ int mic_tcp_socket(start_mode sm)
 {
    
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-   set_loss_rate(0);
+   set_loss_rate(rate_loss);
 
    if(initialize_components(sm) == -1){
    	fprintf(stderr, "initialize_components a échouée dans mic_tcp_socket lors de la création du socket %d \n", compteur_socket);
@@ -64,10 +65,7 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
     //Dans la v2, on ne traite pas encore la phase d'établissement de connexion
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-    sock.remote_addr.ip_addr.addr_size = 255;
-    sock.remote_addr.ip_addr.addr = malloc(sizeof(char) * 255);
-    sock.local_addr.ip_addr.addr_size = 255;
-    sock.local_addr.ip_addr.addr = malloc(sizeof(char) * 255);
+
 	sock.state = IDLE;
     sock.remote_addr = *addr;
     //socket_local.remote_addr = *addr;
@@ -109,20 +107,8 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-    sock.remote_addr.ip_addr.addr_size = 255;
-    sock.remote_addr.ip_addr.addr = malloc(sizeof(char) * 255);
-    
 
-    if(sock.remote_addr.ip_addr.addr == NULL){
-        exit(1);
-    }
-    sock.local_addr.ip_addr.addr_size = 255;
-    sock.local_addr.ip_addr.addr = malloc(sizeof(char)*255);
     sock.remote_addr = addr;
-
-    if(sock.local_addr.ip_addr.addr == NULL){
-        exit(1);
-    }
 
     fprintf(stderr, " [CONNECT ] adresse sock distant %s \n", sock.remote_addr.ip_addr.addr);
 
@@ -156,29 +142,34 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
     //envoie du PDU
 	int effective_send = IP_send(pdu, sock.remote_addr.ip_addr);
 
-    printf("[MICTPC] On a envoyé %d octets\n", effective_send);
+    //printf("[MICTPC] On a envoyé %d octets\n", effective_send);
 	
     //Il se met en attente du pdu, avec le timer timeout
 
+    sock.remote_addr.ip_addr.addr_size = 0;
+    sock.local_addr.ip_addr.addr_size = 0;
+
     
+
 
     int received, compteur = 0;
     do{
         do{
-            fprintf(stderr, "le timeout est de %ld", timeout);
-            //sock.remote_addr.ip_addr.addr_size = 0;
-            //sock.local_addr.ip_addr.addr_size = 0;
+            sock.remote_addr.ip_addr.addr_size = 0;
+            sock.local_addr.ip_addr.addr_size = 0;
             if((received = IP_recv(&recv_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout))==-1){
                 fprintf(stderr, "IP_recv a échoué \n\n");
                 //Si le timer expire, on renvoie le pdu
                 effective_send = IP_send(pdu, sock.remote_addr.ip_addr);
-                printf("[MICTPC] On a envoyé %d octets\n", effective_send);
+                printf("[MICTPC] On a renvoyé %d octets\n", effective_send);
                 compteur++;
             }
 
         }while(received ==-1 && compteur <= limite_envoie); 
 
         fprintf(stderr, "Le numéro de séquence envoyé est le %d et l'ack reçu est le %d\n", seq_envoye, recv_pdu.header.ack_num);
+        compteur = 0;
+
 
     }while(recv_pdu.header.ack_num !=seq_envoye);
     
@@ -262,7 +253,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 
         if(pdu.header.seq_num == dernier_num_seq_traite){
 
-            printf("[MICTCP] Réception d'un numéro de séquence non attendu : %d au lieu de %d", pdu.header.seq_num, seq_attendu);
+            printf("[MICTCP] Réception d'un numéro de séquence non attendu : %d au lieu de %d\n", pdu.header.seq_num, seq_attendu);
             
             ack_pdu.header.source_port = sock.local_addr.port; 
             ack_pdu.header.dest_port = sock.remote_addr.port;
@@ -272,14 +263,14 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 
             IP_send(ack_pdu, remote_addr);
 
-            fprintf(stderr, "[MICTCP] Renvoie de l'ack %d\n", ack_pdu.header.ack);
+            fprintf(stderr, "[MICTCP] Renvoie de l'ack %d\n", ack_pdu.header.ack_num);
         }
 
         if(seq_attendu == pdu.header.seq_num){
 
 
-            fprintf(stderr, " adresse sock distant %s \n", remote_addr.addr);
-            fprintf(stderr, "port source %d, port dest : %d\n", sock.local_addr.port, sock.remote_addr.port);
+            //fprintf(stderr, " adresse sock distant %s \n", remote_addr.addr);
+            //fprintf(stderr, "port source %d, port dest : %d\n", sock.local_addr.port, sock.remote_addr.port);
 
 
             ack_pdu.header.source_port = sock.local_addr.port; 
@@ -290,7 +281,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
 
             IP_send(ack_pdu, remote_addr);
 
-            fprintf(stderr, "[MICTCP] Envoie de l'ack %d\n", ack_pdu.header.ack);
+            //fprintf(stderr, "[MICTCP] Envoie de l'ack %d\n", ack_pdu.header.ack);
 
             dernier_num_seq_traite = seq_attendu;
             seq_attendu = (seq_attendu + 1) % 2;

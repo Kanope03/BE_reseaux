@@ -152,6 +152,9 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
     if ((setsockopt(sys_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) >= 0) {
        result = recvfrom(sys_socket, buffer, buffer_size, 0, (struct sockaddr *)&tmp_addr, &tmp_addr_size);
     }
+    else{
+        fprintf(stderr, "A retirer mais setcockopt a échoué \n");
+    }
 
     if (result != -1) {
         /* Create the mic_tcp_pdu */
@@ -177,6 +180,8 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
         result -= API_HD_Size;
 
     }
+
+    printf("On arrive ici et result vaut %d\n", result);
 
     /* Free the reception buffer */
     free(buffer);
