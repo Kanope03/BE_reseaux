@@ -96,7 +96,7 @@ int initialize_components(start_mode mode)
 
 int IP_send(mic_tcp_pdu pk, mic_tcp_ip_addr addr)
 {
-    
+
     int result = -1;
     int random = rand();
     int lr_tresh = (int) round(((float)loss_rate/100.0)*RAND_MAX);
@@ -152,9 +152,6 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
     if ((setsockopt(sys_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) >= 0) {
        result = recvfrom(sys_socket, buffer, buffer_size, 0, (struct sockaddr *)&tmp_addr, &tmp_addr_size);
     }
-    else{
-        fprintf(stderr, "A retirer mais setcockopt a échoué \n");
-    }
 
     if (result != -1) {
         /* Create the mic_tcp_pdu */
@@ -164,8 +161,8 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
 
         /* Generate a stub address */
         if (remote_addr != NULL) {
-            inet_ntop(AF_INET, &(tmp_addr.sin_addr),remote_addr->addr,remote_addr->addr_size);
-            //remote_addr->addr = "localhost";
+            //inet_ntop(AF_INET, &(tmp_addr.sin_addr),remote_addr->addr,remote_addr->addr_size);
+            remote_addr->addr = "localhost";
             remote_addr->addr_size = strlen(remote_addr->addr) + 1; // don't forget '\0'
         }
 
