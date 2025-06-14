@@ -19,7 +19,7 @@ int fenetre[10] ={1, 1, 1, 1, 1, 1, 1, 1, 1, 1} ;
 int taille_fenetre = 10;
 
 //Fonctions qui serviront à gérer la perte grace à la fenetre
-int taux_perte(){
+int afficher_taux_perte(){
     int taux = 0;
     for(int i=0; i<taille_fenetre; i++)
         taux += fenetre[i];
@@ -55,14 +55,8 @@ int mic_tcp_socket(start_mode sm)
    	fprintf(stderr, "initialize_components a échouée dans mic_tcp_socket lors de la création du socket %d \n", compteur_socket);
    	exit(EXIT_FAILURE);
    }
-   compteur_socket++;
 
-   if(compteur_socket>=NB_MAX_SOCKET){
-    fprintf(stderr, "Trop de demande de connexion");
-   	exit(EXIT_FAILURE);
-   }
    sock.fd = compteur_socket;   //Attribution d'un numero et modification de l'etat du socket
-   sock.state = CLOSED;
 
    return sock.fd;
 }
@@ -76,9 +70,7 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
    printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
    sock.local_addr = addr;
 
-    //fprintf(stderr, "Le num de port est %d\n", sock.local_addr.port);
-
-   return 0;    
+    return 0;    
 }
 
 /*
@@ -173,16 +165,16 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
 
     //Si on n'a pas reçu de ack jusqu'à expiration du timeout
     if(IP_recv(&recv_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout) == -1){
-        printf("On n'a pas reçu le ACK\t");
+        printf("On n'a pas reçu l'ACK\t");
         //glisser(0);
         //affiche_fenetre();
         //Si la perte est acceptable, on tolère l'envoie du message, sinon on renvoie le message
-        if(taux_perte()>perte){
-            printf("La perte est innacceptable (%d), on demande le renvoi\n", taux_perte()); 
+        if(afficher_taux_perte()>perte){
+            printf("La perte n'est pas acceptable (%d %%), on renvoie le PDU\n", afficher_taux_perte()); 
             return mic_tcp_send(mic_sock, mesg, mesg_size);
         }  
         else{
-            printf("On accepte la perte (%d) et on passe à autre chose\n ", taux_perte());
+            printf("On accepte la perte (%d) et on passe à autre chose\n ", afficher_taux_perte());
             glisser(0);
             affiche_fenetre(); 
             seq_envoye++;           
@@ -193,9 +185,7 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
     //Si on reçoit un ack mais ce n'est pas le bon numéro d'acquittement, on applique le même principe que lors de l'expiration du timeout
 	if(recv_pdu.header.ack_num != seq_envoye){
         printf("Le numero d'ack recu (%d) n'est pas le bon, celui attendu était %d, on renvoie la donnée\n ", recv_pdu.header.ack_num, seq_envoye);
-        //glisser(0);
-        //affiche_fenetre();
-        if(taux_perte()>perte)
+        if(afficher_taux_perte()>perte)
             return mic_tcp_send(sock.fd, mesg, mesg_size);
         else{
             fenetre[taille_fenetre-(abs(recv_pdu.header.ack_num - seq_envoye))] = 1; 
@@ -264,6 +254,7 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
     ack_pdu.header.dest_port = pdu.header.source_port;
     ack_pdu.header.source_port = pdu.header.dest_port; 
     ack_pdu.payload.size = 0;
+
     
 
     //Si le message reçu a déjà été traité, on renvoie le ack correspondant
@@ -284,8 +275,6 @@ void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_i
         seq_attendu = (pdu.header.seq_num+1); 
         app_buffer_put(pdu.payload);
 
-    }else{
-        printf("Le numéro d'ACK recu est le %d \n", pdu.header.seq_num);
     }
     
 }
