@@ -96,7 +96,7 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
 
     recv_pdu.payload.size = 0;
 
-    //Initialisation du message à envoyer (headers et pauload)
+    //Initialisation du message à envoyer (headers et payload)
     pdu.header.dest_port = sock.remote_addr.port;
     pdu.header.seq_num = seq_envoye;
     pdu.header.syn = 0;
