@@ -15,7 +15,10 @@ int dernier_num_seq_traite = -1;
 int rate_loss = 30;
 int perte = 20;     //Représente le taux de perte en %, cad par exemple sur une 10 paquet envoyé avec un taux à 20%, on peut autoriser 2 paquet perdu
 
-int fenetre[10] ={1, 1, 1, 1, 1, 1, 1, 1, 1, 1} ;
+int nb_message_envoye = 0;
+int nb_message_recu = 0;
+
+int fenetre[10] ={1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 int taille_fenetre = 10;
 
 //Fonctions qui serviront à gérer la perte grace à la fenetre
@@ -57,6 +60,7 @@ int mic_tcp_socket(start_mode sm)
    }
 
    sock.fd = compteur_socket;   //Attribution d'un numero et modification de l'etat du socket
+   sock.state = IDLE;
 
    return sock.fd;
 }
@@ -77,42 +81,17 @@ int mic_tcp_bind(int socket, mic_tcp_sock_addr addr)
  * Met le socket en état d'acceptation de connexions
  * Retourne 0 si succès, -1 si erreur
  */
+ // addr n'est pas utilisé dans server.c (ni dans gateaway). 
 int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 {
-    //Dans la v2, on ne traite pas encore la phase d'établissement de connexion
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
 
+
 	sock.state = IDLE;
-    sock.remote_addr = *addr;
+
 	return 0; 
-	
-
-    /*
     
-
-    mic_tcp_pdu pdu_syn, pdu_synack, pdu_ack;
-    int compteur_envoie = 10;
-    //On se met en attente d'un SYN puis on recupere le SYN
-    if(IP_recv(&pdu_syn, &socket_local.local_addr.ip_addr, &socket_distant_associe.local_addr.ip_addr, timeout)){printf("Error: IP_recv error for the first ack");return -1;}
-    //On envoie un ack
-    if(pdu_syn.header.syn == 1){
-        pdu_synack.header.ack = 1;
-        pdu_synack.header.syn = 1;
-        if(IP_send(pdu_synack, socket_local.local_addr.ip_addr)){printf("Error: IP_send didn't send the synack");return -1;}
-        //On se met en attente d'un ack
-        for( int i=0; i<compteur_envoie; i++){
-        if(IP_recv(&pdu_ack, &socket_local.local_addr.ip_addr, &socket_distant_associe.local_addr.ip_addr, timeout)){
-            //Si le teimer expire, on renvoie le ack
-            if(IP_send(pdu_synack, socket_local.local_addr.ip_addr)){printf("Error: IP_send didn't send the synack");return -1;}
-        }
-        //Si il accepte la connection
-        if(pdu_ack.header.ack == 1){
-            socket_local.remote_addr = *addr;
-            return 0; 
-        }
-    }   
-
-    }*/
+    
 }
 
 /*
@@ -122,10 +101,48 @@ int mic_tcp_accept(int socket, mic_tcp_sock_addr* addr)
 int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 {
     printf("[MIC-TCP] Appel de la fonction: ");  printf(__FUNCTION__); printf("\n");
-
     sock.remote_addr = addr;
 
-    fprintf(stderr, " [CONNECT ] adresse sock distant %s \n", sock.remote_addr.ip_addr.addr);
+    
+
+    mic_tcp_pdu syn_pdu;
+
+    syn_pdu.payload.size = 0;
+    syn_pdu.header.syn = 1;
+    syn_pdu.header.ack = 0;
+    syn_pdu.header.fin = 0;
+    syn_pdu.header.dest_port = sock.remote_addr.port;
+    syn_pdu.header.source_port = sock.local_addr.port;
+    syn_pdu.payload.size = 0;
+
+    mic_tcp_pdu syn_ack_pdu;
+
+
+    IP_send(syn_pdu, addr.ip_addr);
+
+    sock.state = SYN_SENT;
+
+    if(IP_recv(&syn_ack_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout) != -1){
+        //Si l'on reçoit le syn_ack alors la connexion est établie (de notre pdv) et on envoie l'ack
+        if(syn_ack_pdu.header.syn == 1 && syn_ack_pdu.header.ack == 1){
+            sock.state = ESTABLISHED;
+            mic_tcp_pdu ack_pdu;
+            ack_pdu.header.syn = 0;
+            ack_pdu.header.ack = 1;
+            ack_pdu.header.fin = 0;
+            ack_pdu.header.dest_port = sock.remote_addr.port;
+            ack_pdu.header.source_port = sock.local_addr.port;
+            ack_pdu.payload.size = 0;
+
+            IP_send(ack_pdu, addr.ip_addr);
+        }
+    }else{
+        printf("\n");
+    }
+
+    if(sock.state != ESTABLISHED){
+        return -1;
+    }
 
 	return 0;
 }
@@ -156,50 +173,62 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
     sock.remote_addr.ip_addr.addr_size = 0;
     sock.local_addr.ip_addr.addr_size = 0;
 
-    effective_sent = IP_send(pdu, sock.remote_addr.ip_addr);
+    int effective_received = -1;
     printf("Ack attendu normalement: %d\n", seq_envoye);
 
-    if(effective_sent == -1 ){
-        fprintf(stderr, "Erreur lors de l'envoie des données avec IP_send \n");
-    }
 
     //Si on n'a pas reçu de ack jusqu'à expiration du timeout
-    if(IP_recv(&recv_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout) == -1){
-        printf("On n'a pas reçu l'ACK\t");
-        //glisser(0);
-        //affiche_fenetre();
-        //Si la perte est acceptable, on tolère l'envoie du message, sinon on renvoie le message
-        if(afficher_taux_perte()>perte){
-            printf("La perte n'est pas acceptable (%d %%), on renvoie le PDU\n", afficher_taux_perte()); 
-            return mic_tcp_send(mic_sock, mesg, mesg_size);
-        }  
-        else{
-            printf("On accepte la perte (%d) et on passe à autre chose\n ", afficher_taux_perte());
-            glisser(0);
-            affiche_fenetre(); 
-            seq_envoye++;           
-            return effective_sent;
-        } 
-    }
+    while(effective_received == -1){
+        IP_send(pdu, sock.remote_addr.ip_addr);
 
-    //Si on reçoit un ack mais ce n'est pas le bon numéro d'acquittement, on applique le même principe que lors de l'expiration du timeout
-	if(recv_pdu.header.ack_num != seq_envoye){
-        printf("Le numero d'ack recu (%d) n'est pas le bon, celui attendu était %d, on renvoie la donnée\n ", recv_pdu.header.ack_num, seq_envoye);
-        if(afficher_taux_perte()>perte)
-            return mic_tcp_send(sock.fd, mesg, mesg_size);
-        else{
-            fenetre[taille_fenetre-(abs(recv_pdu.header.ack_num - seq_envoye))] = 1; 
+        printf("Paramètres : pdu.header.dest_port : %d, pdu.header.source_port %d sock.remote_addr.ip_addr.addr : %s, sock.remote_addr.ip_addr.addr_size : %d ", 
+            pdu.header.dest_port, pdu.header.source_port, sock.remote_addr.ip_addr.addr, sock.remote_addr.ip_addr.addr_size);
+
+        effective_received = IP_recv(&recv_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout);
+
+        if(effective_received != -1){
+            //Si on reçoit un ack mais ce n'est pas le bon numéro d'acquittement, on applique le même principe que lors de l'expiration du timeout
+            if(recv_pdu.header.ack_num != seq_envoye){
+                printf("Le numero d'ack recu (%d) n'est pas le bon, celui attendu était %d, on renvoie la donnée\n ", recv_pdu.header.ack_num, seq_envoye);
+                if(afficher_taux_perte()>perte)
+                    effective_received = -1;
+                else{
+                    fenetre[taille_fenetre-(abs(recv_pdu.header.ack_num - seq_envoye))] = 1; 
+                    seq_envoye = (seq_envoye+1);
+                    affiche_fenetre();
+                    return effective_sent;
+                }
+            }
+
+            //Sinon, on a reçu le ack et c'est bien le bon, on incrément et on met a jour la fenetre
+            printf("ACK reçu: %d\n", recv_pdu.header.ack_num);
             seq_envoye = (seq_envoye+1);
+            glisser(1);
             affiche_fenetre();
-            return effective_sent;
+
         }
+        else{
+            printf("On n'a pas reçu l'ACK\t");
+            //glisser(0);
+            //affiche_fenetre();
+            //Si la perte est acceptable, on tolère l'envoie du message, sinon on renvoie le message
+            if(afficher_taux_perte()>perte){
+                printf("La perte n'est pas acceptable (%d %%), on renvoie le PDU\n", afficher_taux_perte()); 
+            }  
+            else{
+                printf("On accepte la perte (%d) et on passe à autre chose\n ", afficher_taux_perte());
+                glisser(0);
+                affiche_fenetre(); 
+                seq_envoye++;
+                return effective_sent;
+            } 
+        }
+        
+        
     }
 
-    //Sinon, on a reçu le ack et c'est bien le bon, on incrément et on met a jour la fenetre
-    printf("ACK reçu: %d\n", recv_pdu.header.ack_num);
-    seq_envoye = (seq_envoye+1);
-    glisser(1);
-    affiche_fenetre();
+    
+    
     return effective_sent;
 }
 
@@ -240,42 +269,72 @@ int mic_tcp_close (int socket)
 void process_received_PDU(mic_tcp_pdu pdu, mic_tcp_ip_addr local_addr, mic_tcp_ip_addr remote_addr)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
+
+    printf("remote_addr.addr_size vaut %d\n",remote_addr.addr_size);
     
     if(pdu.header.dest_port != sock.local_addr.port){
         fprintf(stderr, " %d != %d : Le port de destination du pdu n'est pas un port local attribué à un socket mictcp\n", pdu.header.dest_port, sock.local_addr.port);
         return;
 	}
-    
-    //Initialisation du ack à envoyer
-    mic_tcp_pdu ack_pdu;
-    ack_pdu.header.syn = 0;
-    ack_pdu.header.ack = 1;
-    ack_pdu.header.fin = 0;
-    ack_pdu.header.dest_port = pdu.header.source_port;
-    ack_pdu.header.source_port = pdu.header.dest_port; 
-    ack_pdu.payload.size = 0;
 
-    
+    if(sock.state == IDLE){
+        if(pdu.header.syn == 1){
+            sock.state = SYN_RECEIVED;
+        }
 
-    //Si le message reçu a déjà été traité, on renvoie le ack correspondant
-    if(pdu.header.seq_num == dernier_num_seq_traite){
-        ack_pdu.header.ack_num = dernier_num_seq_traite;
-        printf("[MIC-TCP processreceivedpdu] msg deja traité, envoie de l'ack %d\n ", ack_pdu.header.ack_num);
-        IP_send(ack_pdu, remote_addr);
-    }
+        mic_tcp_pdu syn_ack_pdu;
+        syn_ack_pdu.header.syn = 1;
+        syn_ack_pdu.header.ack = 1;
+        syn_ack_pdu.header.fin = 0;
+        syn_ack_pdu.header.dest_port = pdu.header.source_port;
+        syn_ack_pdu.header.source_port = sock.local_addr.port;
+        syn_ack_pdu.payload.size = 0;
 
-    //Si on recoit le bon message attendu, on le met dans le buffer, on note que le message a déjà été traité, on envoie le ack et on incrémente le prochain numéro de séquence attendu
-    else if(pdu.header.seq_num >= seq_attendu){
-        
-        ack_pdu.header.ack_num = pdu.header.seq_num;
-        
-        dernier_num_seq_traite = pdu.header.seq_num;
-        printf("[MIC-TCP processreceivedpdu] message bien recu, envoie de l'ack %d\n ", ack_pdu.header.ack_num);
-        IP_send(ack_pdu, remote_addr);
-        seq_attendu = (pdu.header.seq_num+1); 
-        app_buffer_put(pdu.payload);
+        IP_send(syn_ack_pdu, remote_addr);
 
     }
+
+    else if(sock.state == SYN_RECEIVED){
+        //Si on reçoit le ack du syn_ack alors la connexion est établie. 
+        if(pdu.header.ack == 1){
+            sock.state = ESTABLISHED;
+        }
+    }
+    
+
+    else if(sock.state == ESTABLISHED){
+        //Initialisation du ack à envoyer
+        mic_tcp_pdu ack_pdu;
+        ack_pdu.header.syn = 0;
+        ack_pdu.header.ack = 1;
+        ack_pdu.header.fin = 0;
+        ack_pdu.header.dest_port = pdu.header.source_port;
+        ack_pdu.header.source_port = pdu.header.dest_port; 
+        ack_pdu.payload.size = 0;
+
+
+        //Si le message reçu a déjà été traité, on renvoie le ack correspondant
+        if(pdu.header.seq_num == dernier_num_seq_traite){
+            ack_pdu.header.ack_num = dernier_num_seq_traite;
+            printf("[MIC-TCP processreceivedpdu] msg deja traité, envoie de l'ack %d vers l'addresse %s\n ", ack_pdu.header.ack_num, remote_addr.addr);
+            IP_send(ack_pdu, remote_addr);
+        }
+
+        //Si on recoit le bon message attendu, on le met dans le buffer, on note que le message a déjà été traité, on envoie le ack et on incrémente le prochain numéro de séquence attendu
+        else if(pdu.header.seq_num >= seq_attendu){
+            
+            ack_pdu.header.ack_num = pdu.header.seq_num;
+            
+            dernier_num_seq_traite = pdu.header.seq_num;
+            printf("[MIC-TCP processreceivedpdu] message bien recu, envoie de l'ack %d vers l'addresse %s\n ", ack_pdu.header.ack_num, remote_addr.addr);
+            IP_send(ack_pdu, remote_addr);
+            seq_attendu = (pdu.header.seq_num+1); 
+            app_buffer_put(pdu.payload);
+
+        }
+    }
+
+    
     
 }
 
