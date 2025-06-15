@@ -47,7 +47,7 @@ void affiche_fenetre(){
 
 mic_tcp_sock sock;
 
-//Dans cette v2, on ne gère pas encore l'établissement de connexion
+//Dans cette v3, on ne gère pas encore l'établissement de connexion
 
 /*
  * Permet de créer un socket entre l’application et MIC-TCP

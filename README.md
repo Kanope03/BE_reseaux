@@ -1,6 +1,3 @@
-# BE RESEAU
-## TPs BE Reseau - 3 MIC
-
 =======
 # BE RESEAU
 ## TPs BE Reseau - 3 MIC
