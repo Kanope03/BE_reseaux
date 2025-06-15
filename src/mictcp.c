@@ -1,6 +1,7 @@
 #include "../include/mictcp.h"
 #include "api/mictcp_core.h"
 #include <strings.h>
+#include <time.h>
 
 
 #define NB_MAX_SOCKET 10
@@ -116,13 +117,14 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
     syn_pdu.payload.size = 0;
 
     mic_tcp_pdu syn_ack_pdu;
+    syn_ack_pdu.payload.size = 0;
 
 
     IP_send(syn_pdu, addr.ip_addr);
 
     sock.state = SYN_SENT;
 
-    if(IP_recv(&syn_ack_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout) != -1){
+    if(IP_recv(&syn_ack_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout*3) != -1){
         //Si l'on reçoit le syn_ack alors la connexion est établie (de notre pdv) et on envoie l'ack
         if(syn_ack_pdu.header.syn == 1 && syn_ack_pdu.header.ack == 1){
             sock.state = ESTABLISHED;
@@ -154,8 +156,9 @@ int mic_tcp_connect(int socket, mic_tcp_sock_addr addr)
 int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
 {
     printf("[MIC-TCP] Appel de la fonction: "); printf(__FUNCTION__); printf("\n");
-	
+
     mic_tcp_pdu pdu, recv_pdu;
+    recv_pdu.payload.size = 0 ;
 
     //Initialisation du message à envoyer (headers et payload)
     pdu.header.dest_port = sock.remote_addr.port;
@@ -181,9 +184,7 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
     while(effective_received == -1){
         IP_send(pdu, sock.remote_addr.ip_addr);
 
-        printf("Paramètres : pdu.header.dest_port : %d, pdu.header.source_port %d sock.remote_addr.ip_addr.addr : %s, sock.remote_addr.ip_addr.addr_size : %d ", 
-            pdu.header.dest_port, pdu.header.source_port, sock.remote_addr.ip_addr.addr, sock.remote_addr.ip_addr.addr_size);
-
+        
         effective_received = IP_recv(&recv_pdu, &sock.local_addr.ip_addr, &sock.remote_addr.ip_addr, timeout);
 
         if(effective_received != -1){
@@ -195,7 +196,6 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
                 else{
                     fenetre[taille_fenetre-(abs(recv_pdu.header.ack_num - seq_envoye))] = 1; 
                     seq_envoye = (seq_envoye+1);
-                    affiche_fenetre();
                     return effective_sent;
                 }
             }
@@ -204,7 +204,6 @@ int mic_tcp_send(int mic_sock, char* mesg, int mesg_size)
             printf("ACK reçu: %d\n", recv_pdu.header.ack_num);
             seq_envoye = (seq_envoye+1);
             glisser(1);
-            affiche_fenetre();
 
         }
         else{

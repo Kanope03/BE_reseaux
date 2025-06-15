@@ -5,6 +5,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <strings.h>
+#include <errno.h>
 
 /*****************
  * API Variables *
@@ -148,6 +149,10 @@ int IP_recv(mic_tcp_pdu* pk, mic_tcp_ip_addr* local_addr, mic_tcp_ip_addr* remot
     /* Create a reception buffer */
     int buffer_size = API_HD_Size + pk->payload.size;
     char *buffer = malloc(buffer_size);
+
+    if(buffer == NULL){
+        fprintf(stderr, "LE MALLOC A ECHOUE\n");
+    }
 
     if ((setsockopt(sys_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))) >= 0) {
        result = recvfrom(sys_socket, buffer, buffer_size, 0, (struct sockaddr *)&tmp_addr, &tmp_addr_size);
