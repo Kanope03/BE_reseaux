@@ -58,7 +58,7 @@ La v4.1 est fonctionnelle
 
 A continuer
 Dans cette version, on gère plusieurs communication, c'est à dire que le puits (programme principal) se mettra toujours en attente et génèrera des threads à chaque nouvelle demande de connexion. 
-Afin de gérer plusieurs connexions cette fois-ci , nous utilisons un tableau de socket.
+On a mis en place en place le système pour récuperer le descripteur de fichier du socket à partir du tid du thread. Il reste à implémenter le lancement du thread côté puits qui va gérer la réception des données de la source tandis qu'un autre thread s'occupe des établissements de connexions. 
 
 ### Limites du projet:
 
