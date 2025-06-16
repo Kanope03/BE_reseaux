@@ -45,7 +45,7 @@ Il s'agit ici de garder une certaine fiabilité du transfert des données avec u
 On a choisit une taille de 100 pour notre fenetre pour gérer plus aisément le % de perte.
 La v3 est fonctionnelle (texte et vidéo)
 
-A noté que dans ces 3 première version, on n'utilise qu'un socket par programme. On a donc pas eu besoin de créer un tableau de socket car chaque programme gère son propre socket
+A noté que dans ces 3 première version, on n'utilise qu'un socket par programme. Il n'est pour l'instant pas possible d'avoir plusieurs sources pour un même puits.
 
 ### version v4
 
